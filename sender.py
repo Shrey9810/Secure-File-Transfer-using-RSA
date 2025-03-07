@@ -44,7 +44,7 @@ d_s = mod_inverse(e_s, phi_s)
 # TCP Client to Send Encrypted File
 def sender():
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect(('172.32.1.238', 12345))
+    client_socket.connect(('XXX.XXX.XXX.XXX', 12345))
 
     # Send sender's public key
     client_socket.send(f"{n_s},{e_s}".encode())
