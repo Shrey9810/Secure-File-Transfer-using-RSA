@@ -4,6 +4,7 @@ import time
 import math
 import socket
 import os
+import hashlib
 
 random.seed(time.time())
 
@@ -44,7 +45,7 @@ d_s = mod_inverse(e_s, phi_s)
 # TCP Client to Send Encrypted File
 def sender():
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect(('XXX.XXX.XXX.XXX', 12345))
+    client_socket.connect(('XXX.XXX.XXX.XXX', 12345)) #Change with reciever's IP Address
 
     # Send sender's public key
     client_socket.send(f"{n_s},{e_s}".encode())
@@ -68,32 +69,43 @@ def sender():
     with open(file_path, "rb") as file:
         file_content = file.read()
 
-    # Determine the max chunk size dynamically
-    max_chunk_size = min((n_s.bit_length() // 8) - 1, (n_r.bit_length() // 8) - 1)
+    # Choose chunk size so that the plaintext integer is less than n_r
+    max_chunk_size = (n_r.bit_length() // 8) - 1
     chunks = [file_content[i:i+max_chunk_size] for i in range(0, len(file_content), max_chunk_size)]
     # Record the original length for each chunk
     chunk_sizes = [len(chunk) for chunk in chunks]
 
-    # Double Encryption: Sign with sender's private key, then encrypt with receiver's public key
-    cipher_chunks = []
+    # Encrypt then sign:
+    # 1. Encrypt each chunk with receiver's public key.
+    # 2. Compute hash of the ciphertext.
+    # 3. Sign the hash with sender's private key.
+    encrypted_chunks = []
+    signatures = []
     for chunk in chunks:
         msg_int = int.from_bytes(chunk, 'big')
-        signed_msg = pow(msg_int, d_s, n_s)      # Sign with sender's private key
-        encrypted_msg = pow(signed_msg, e_r, n_r)  # Encrypt with receiver's public key
-        cipher_chunks.append(str(encrypted_msg))
+        # Encrypt with receiver's public key
+        encrypted_msg = pow(msg_int, e_r, n_r)
+        # Compute SHA-256 hash of the ciphertext (as string)
+        hash_obj = hashlib.sha256(str(encrypted_msg).encode())
+        hash_val = int.from_bytes(hash_obj.digest(), 'big')
+        # Sign the hash with sender's private key
+        signature = pow(hash_val, d_s, n_s)
+        encrypted_chunks.append(str(encrypted_msg))
+        signatures.append(str(signature))
 
     # Send the number of chunks first
-    client_socket.send(str(len(cipher_chunks)).encode())
+    client_socket.send(str(len(encrypted_chunks)).encode())
     client_socket.recv(1024)  # Wait for acknowledgment
 
-    # Send the comma-separated list of chunk sizes
+    # Send the comma-separated list of original chunk sizes
     sizes_str = ','.join(map(str, chunk_sizes))
     client_socket.send(sizes_str.encode())
     client_socket.recv(1024)  # Wait for acknowledgment
 
-    # Send encrypted chunks one by one
-    for cipher in cipher_chunks:
-        client_socket.send(cipher.encode())
+    # For each chunk, send both the encrypted ciphertext and its signature (comma-separated)
+    for enc, sig in zip(encrypted_chunks, signatures):
+        payload = f"{enc},{sig}"
+        client_socket.send(payload.encode())
         client_socket.recv(1024)  # Wait for acknowledgment
 
     print("Encrypted file sent successfully.")
