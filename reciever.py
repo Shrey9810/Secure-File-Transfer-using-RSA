@@ -4,6 +4,7 @@ import time
 import math
 import socket
 import os
+import hashlib
 
 random.seed(time.time())
 
@@ -73,29 +74,37 @@ def server():
     chunk_sizes = list(map(int, sizes_str.split(',')))
     conn.send(b"ACK")  # Send acknowledgment
 
-    cipher_chunks = []
+    encrypted_chunks = []
+    signatures = []
     for _ in range(num_chunks):
-        cipher_text = conn.recv(4096).decode()
-        cipher_chunks.append(int(cipher_text))
+        # Each payload is "encrypted_msg,signature"
+        payload = conn.recv(4096).decode()
+        enc_str, sig_str = payload.split(',')
+        encrypted_chunks.append(int(enc_str))
+        signatures.append(int(sig_str))
         conn.send(b"ACK")  # Send acknowledgment
 
     print("Received encrypted file.")
 
-    # First decryption: decrypt with receiver's private key
-    decrypted_chunks = [pow(C, d_r, n_r) for C in cipher_chunks]
-
-    # Second decryption: verify signature using sender's public key and recover original bytes
+    # For each chunk, verify the signature and then decrypt with receiver's private key
     decrypted_data = b''
-    for i, C in enumerate(decrypted_chunks):
-        # Recover the original message integer using sender's public key
-        recovered_int = pow(C, e_s, n_s)
-        # Convert recovered_int to bytes using its natural length
-        rec_bytes = recovered_int.to_bytes((recovered_int.bit_length() + 7) // 8, 'big')
+    for i, (encrypted_msg, signature) in enumerate(zip(encrypted_chunks, signatures)):
+        # Recompute the hash of the ciphertext
+        hash_obj = hashlib.sha256(str(encrypted_msg).encode())
+        hash_val = int.from_bytes(hash_obj.digest(), 'big')
+        # Verify signature: recover the hash from the signature using sender's public key
+        recovered_hash = pow(signature, e_s, n_s)
+        if recovered_hash != hash_val:
+            print("Signature verification failed for a chunk.")
+            return
+
+        # Decrypt with receiver's private key
+        msg_int = pow(encrypted_msg, d_r, n_r)
+        # Convert integer back to bytes. Use the recorded chunk size.
+        rec_bytes = msg_int.to_bytes((msg_int.bit_length() + 7) // 8, 'big')
         expected_length = chunk_sizes[i]
-        # If the recovered bytes are shorter than expected, pad on the left with zeros
         if len(rec_bytes) < expected_length:
             rec_bytes = rec_bytes.rjust(expected_length, b'\x00')
-        # If they are longer than expected, trim the extra bytes from the left
         elif len(rec_bytes) > expected_length:
             rec_bytes = rec_bytes[-expected_length:]
         decrypted_data += rec_bytes
@@ -105,7 +114,7 @@ def server():
     with open(output_file_path, "wb") as file:
         file.write(decrypted_data)
 
-    print(f"\nDecrypted file saved as: {output_file_path}")
+    print(f"Decrypted file saved as: {output_file_path}")
     conn.close()
 
 if __name__ == "__main__":
