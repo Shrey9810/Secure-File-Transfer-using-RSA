@@ -1,7 +1,7 @@
 # Secure File Transfer and Chatting Using RSA Encryption
 
 ## Overview
-This project demonstrates a secure file transfer system where a sender transmits a file to a receiver using RSA encryption and digital signatures. The system employs socket programming to establish a TCP connection, exchange public keys, and securely transfer data in dynamically sized chunks. Additionally, a secure chat feature is implemented using the same encryption mechanism. This project ensures confidentiality, integrity, and authentication through RSA encryption and digital signatures.
+This project demonstrates a secure file transfer system where a sender transmits a file to a receiver using RSA encryption and digital signatures. The system employs socket programming to establish a TCP connection, exchange public keys, and securely transfer data in dynamically sized chunks. Additionally, a secure chat feature is implemented using the same encryption mechanism. The system ensures *Confidentiality, Integrity, and Authentication* in both file transfer and chat communication.
 
 ## Features
 - *RSA Encryption & Digital Signature:*  
@@ -15,6 +15,8 @@ This project demonstrates a secure file transfer system where a sender transmits
   - Secure exchange of public keys between sender and receiver to facilitate encrypted communication.
 - *Secure Chat:*  
   - Implements an encrypted chat system between sender and receiver using RSA encryption.
+- *Supports Various File Types:*  
+  - Allows secure transfer of different file formats, including text files (.txt), source code (.c, .cpp, .py, .html, .css), images (.png), audio files, and videos (.mp4) etc.
 
 ## Technology Used
 - *Python*  
